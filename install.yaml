@@ -18,10 +18,15 @@
       with_items:
         - openjdk-11-jdk
 
-    - name: Download Kafka
-      get_url:
-        url: "{{ kafka_download_url }}"
-        dest: /tmp/kafka_{{ kafka_version }}.tgz
+    - name: Download Kafka with wget and show progress
+      shell: |
+        wget --progress=dot:mega "{{ kafka_download_url }}" -O /tmp/kafka_{{ kafka_version }}.tgz
+      register: download_status
+      no_log: false
+
+    - name: Show download status
+      debug:
+        var: download_status.stdout
 
     - name: Extract Kafka
       unarchive:
@@ -67,4 +72,3 @@
       systemd:
         name: kafka
         state: reloaded
-
