@@ -2,8 +2,8 @@
   hosts: localhost
   become: yes
   vars:
-    kafka_version: "3.4.0"  # Kafka version to install
-    kafka_download_url: "https://archive.apache.org/dist/kafka/{{ kafka_version }}.tgz"
+    kafka_version: "3.9.0"  # Kafka version to install
+    kafka_download_url: "https://archive.apache.org/dist/kafka/3.9.0/kafka_2.13-3.9.0.tgz"
     broker_id: 1            # Default broker ID
     log_dirs: "/var/lib/kafka"   # Default log directory
     kafka_host: "{{ inventory_hostname }}"  # Use the hostname as Kafka host
