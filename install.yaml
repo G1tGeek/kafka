@@ -1,0 +1,61 @@
+- name: Install Kafka Role
+  hosts: localhost
+  become: yes
+
+  tasks:
+    - name: Ensure Kafka dependencies are installed
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - openjdk-11-jdk
+
+    - name: Download Kafka
+      get_url:
+        url: "{{ kafka_download_url }}"
+        dest: /tmp/kafka_{{ kafka_version }}.tgz
+    
+    - name: Extract Kafka
+      unarchive:
+        src: /tmp/kafka_{{ kafka_version }}.tgz
+        dest: /opt/
+        remote_src: yes
+    
+    - name: Ensure Kafka config directory exists
+      file:
+        path: /opt/kafka_{{ scala_version }}-{{ kafka_version }}/config
+        state: directory
+        mode: '0755'
+    
+    - name: Create Kafka configuration from template
+      template:
+        src: kafka-config.j2
+        dest: /opt/kafka_{{ scala_version }}-{{ kafka_version }}/config/server.properties
+    
+    - name: Create systemd service for Kafka
+      template:
+        src: kafka.service.j2
+        dest: /etc/systemd/system/kafka.service
+      notify:
+        - reload systemd
+    
+    - name: Reload systemd to register kafka service
+      command: sudo systemctl daemon-reload
+    
+    - name: Enable Kafka service to start on boot
+      command: sudo systemctl enable kafka
+    
+    - name: Start Kafka service
+      command: sudo systemctl start kafka
+  
+  handlers:
+    - name: restart kafka
+      systemd:
+        name: kafka
+        state: restarted
+        enabled: yes
+
+    - name: reload kafka
+      systemd:
+        name: kafka
+        state: reloaded
