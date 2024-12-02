@@ -1,6 +1,15 @@
 - name: Install Kafka Role
   hosts: localhost
   become: yes
+  vars:
+    kafka_version: "3.4.0"  # Kafka version to install
+    scala_version: "2.13"   # Scala version for the Kafka build
+    kafka_download_url: "https://archive.apache.org/dist/kafka/{{ kafka_version }}/kafka_{{ scala_version }}-{{ kafka_version }}.tgz"
+    broker_id: 1            # Default broker ID
+    log_dirs: "/var/lib/kafka"   # Default log directory
+    kafka_host: "{{ inventory_hostname }}"  # Use the hostname as Kafka host
+    kafka_port: 9092         # Default Kafka port
+    zookeeper_connect: "localhost:2181"  # Default ZooKeeper address
 
   tasks:
     - name: Ensure Kafka dependencies are installed
@@ -14,40 +23,40 @@
       get_url:
         url: "{{ kafka_download_url }}"
         dest: /tmp/kafka_{{ kafka_version }}.tgz
-    
+
     - name: Extract Kafka
       unarchive:
         src: /tmp/kafka_{{ kafka_version }}.tgz
         dest: /opt/
         remote_src: yes
-    
+
     - name: Ensure Kafka config directory exists
       file:
         path: /opt/kafka_{{ scala_version }}-{{ kafka_version }}/config
         state: directory
         mode: '0755'
-    
+
     - name: Create Kafka configuration from template
       template:
         src: kafka-config.j2
         dest: /opt/kafka_{{ scala_version }}-{{ kafka_version }}/config/server.properties
-    
+
     - name: Create systemd service for Kafka
       template:
         src: kafka.service.j2
         dest: /etc/systemd/system/kafka.service
       notify:
-        - reload systemd
-    
+        - reload kafka
+
     - name: Reload systemd to register kafka service
-      command: sudo systemctl daemon-reload
-    
+      command: systemctl daemon-reload
+
     - name: Enable Kafka service to start on boot
-      command: sudo systemctl enable kafka
-    
+      command: systemctl enable kafka
+
     - name: Start Kafka service
-      command: sudo systemctl start kafka
-  
+      command: systemctl start kafka
+
   handlers:
     - name: restart kafka
       systemd:
@@ -59,3 +68,4 @@
       systemd:
         name: kafka
         state: reloaded
+
