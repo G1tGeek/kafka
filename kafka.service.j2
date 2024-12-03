@@ -1,0 +1,16 @@
+[Unit]
+Description=Apache Kafka server
+Documentation=http://kafka.apache.org/documentation.html
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/opt/kafka_2.13-3.4.0/bin/kafka-server-start.sh /opt/kafka_2.13-3.4.0/config/server.properties
+ExecStop=/opt/kafka_2.13-3.4.0/bin/kafka-server-stop.sh
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
