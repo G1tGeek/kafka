@@ -55,15 +55,3 @@
 
     - name: Start Kafka service
       command: systemctl start kafka
-
-  handlers:
-    - name: restart kafka
-      systemd:
-        name: kafka
-        state: restarted
-        enabled: yes
-
-    - name: reload kafka
-      systemd:
-        name: kafka
-        state: reloaded
