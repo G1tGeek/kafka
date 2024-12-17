@@ -2,13 +2,14 @@
   hosts: localhost
   become: yes
   vars:
-    kafka_version: "3.9.0"  # Kafka version to install
+    kafka_version: "2.12-3.9.0"
     kafka_download_url: "https://downloads.apache.org/kafka/3.9.0/kafka_2.12-3.9.0.tgz"
-    broker_id: 1            # Default broker ID
-    log_dirs: "/var/lib/kafka"   # Default log directory
+    broker_id: 1                # Default broker ID
+    log_dirs: "/var/lib/kafka"  # Default log directory for logs
     kafka_host: "{{ inventory_hostname }}"  # Use the hostname as Kafka host
-    kafka_port: 9092         # Default Kafka port
-    zookeeper_connect: "localhost:2181"  # Default ZooKeeper address
+    kafka_port: 9092            # Default Kafka port
+    kafka_config_dir: "/opt/kafka_{{ kafka_version }}/config"
+    kafka_data_dir: "/var/lib/kafka/data"  # Kraft mode metadata and log storage
 
   tasks:
     - name: Ensure Kafka dependencies are installed
@@ -21,24 +22,35 @@
     - name: Download Kafka
       get_url:
         url: "{{ kafka_download_url }}"
-        dest: /tmp/kafka_{{ kafka_version }}.tgz
+        dest: /tmp/kafka.tgz
 
-    - name: Extract Kafka
+    - name: Extract Kafka 
       unarchive:
-        src: /tmp/kafka_{{ kafka_version }}.tgz
+        src: /tmp/kafka.tgz
         dest: /opt/
         remote_src: yes
 
-    - name: Ensure Kafka config directory exists
+    - name: Ensure Kafka config and data directories exist
       file:
-        path: /opt/kafka_{{ kafka_version }}/config
+        path: "{{ item }}"
         state: directory
         mode: '0755'
+      with_items:
+        - "{{ kafka_config_dir }}"
+        - "{{ kafka_data_dir }}"
 
-    - name: Create Kafka configuration from template
+    - name: Create Kafka Kraft configuration from template
       template:
         src: kafka-config.j2
-        dest: /opt/kafka_{{ kafka_version }}/config/server.properties
+        dest: "{{ kafka_config_dir }}/server.properties"
+
+    - name: Format Kraft metadata directory
+      command: >
+        /opt/kafka_{{ kafka_version }}/bin/kafka-storage.sh format
+        --config {{ kafka_config_dir }}/server.properties
+        --cluster-id kraft-cluster-1 --ignore-formatted
+      args:
+        creates: "{{ kafka_data_dir }}/meta.properties"
 
     - name: Create systemd service for Kafka
       template:
@@ -47,7 +59,7 @@
       notify:
         - reload kafka
 
-    - name: Reload systemd to register kafka service
+    - name: Reload systemd to register Kafka service
       command: systemctl daemon-reload
 
     - name: Enable Kafka service to start on boot
@@ -55,3 +67,20 @@
 
     - name: Start Kafka service
       command: systemctl start kafka
+
+    # Add Kafka to system PATH
+    - name: Add Kafka to PATH
+      lineinfile:
+        path: /etc/profile
+        line: 'export PATH=$PATH:/opt/kafka_{{ kafka_version }}/bin'
+        create: yes
+
+    # Reload profile to apply PATH change
+    - name: Reload profile to apply PATH change
+      shell: bash -c 'source /etc/profile'
+
+  handlers:
+    - name: reload kafka
+      service:
+        name: kafka
+        state: restarted
