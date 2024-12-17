@@ -1,5 +1,5 @@
 - name: Install Kafka Role
-  hosts: localhost
+  hosts: kafka-host
   become: yes
   vars:
     kafka_version: "2.12-3.9.0"
