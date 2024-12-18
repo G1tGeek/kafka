@@ -1,4 +1,13 @@
-###########vpc #################
+################### Fetch Default VPC Details ###################
+
+data "aws_vpc" "default" {
+  filter {
+    name   = "isDefault"
+    values = ["true"]
+  }
+}
+
+################### VPC ###################
 
 resource "aws_vpc" "tool" {
   cidr_block       = var.vpc_cidr_range
@@ -9,7 +18,7 @@ resource "aws_vpc" "tool" {
   }
 }
 
-#########subnet############
+################### Subnets ###################
 
 resource "aws_subnet" "public" {
   vpc_id            = aws_vpc.tool.id
@@ -17,7 +26,7 @@ resource "aws_subnet" "public" {
   availability_zone = var.az1
 
   tags = {
-    Name = "basiton-host"
+    Name = "bastion-host"
   }
 }
 
@@ -51,7 +60,7 @@ resource "aws_subnet" "private3" {
   }
 }
 
-##########Internet Gateway########
+################### Internet Gateway ###################
 
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.tool.id
@@ -61,17 +70,18 @@ resource "aws_internet_gateway" "gw" {
   }
 }
 
-##########Elastic Ip################
+################### Elastic IP ###################
 
 resource "aws_eip" "elastic_ip" {
+  vpc = true
+
   tags = {
     Name = "EIP"
   }
 }
 
-#########NAT Gateway#########
+################### NAT Gateway ###################
 
-# creation NAT GW
 resource "aws_nat_gateway" "NAT" {
   connectivity_type = var.connection_type
   subnet_id         = aws_subnet.public.id
@@ -82,15 +92,15 @@ resource "aws_nat_gateway" "NAT" {
   }
 }
 
-
-##############Route Table############
+################### Route Tables ###################
 
 resource "aws_route_table" "public_RT" {
   vpc_id = aws_vpc.tool.id
   route {
-    cidr_block = var.rt_cidr_range
+    cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.gw.id
   }
+
   tags = {
     Name = "Public_RT"
   }
@@ -99,16 +109,16 @@ resource "aws_route_table" "public_RT" {
 resource "aws_route_table" "private_RT" {
   vpc_id = aws_vpc.tool.id
   route {
-    cidr_block = var.rt_cidr_range
+    cidr_block = "0.0.0.0/0"
     gateway_id = aws_nat_gateway.NAT.id
   }
+
   tags = {
     Name = "Private_RT"
   }
 }
 
-
-##########Route Table Association#########
+################### Route Table Associations ###################
 
 resource "aws_route_table_association" "public" {
   subnet_id      = aws_subnet.public.id
@@ -130,21 +140,22 @@ resource "aws_route_table_association" "private3" {
   route_table_id = aws_route_table.private_RT.id
 }
 
-# security group for public
+################### Security Groups ###################
 
 resource "aws_security_group" "publicSG" {
-
   vpc_id = aws_vpc.tool.id
+
   ingress {
-    from_port   = var.all
-    to_port     = var.all
-    protocol    = var.anywhere
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = [var.sg_cidr_range]
   }
+
   egress {
-    from_port   = var.all
-    to_port     = var.all
-    protocol    = var.anywhere
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = [var.sg_cidr_range]
   }
 
@@ -154,18 +165,19 @@ resource "aws_security_group" "publicSG" {
 }
 
 resource "aws_security_group" "privateSG" {
-
   vpc_id = aws_vpc.tool.id
+
   ingress {
-    from_port   = var.all
-    to_port     = var.all
-    protocol    = var.anywhere
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = [var.sg_cidr_range]
   }
+
   egress {
-    from_port   = var.all
-    to_port     = var.all
-    protocol    = var.anywhere
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = [var.sg_cidr_range]
   }
 
@@ -174,41 +186,37 @@ resource "aws_security_group" "privateSG" {
   }
 }
 
-################### Create VPC Peering Connection ###################
+################### VPC Peering Connection ###################
 
 resource "aws_vpc_peering_connection" "tool_to_default" {
-  vpc_id        = aws_vpc.tool.id
-  peer_vpc_id   = data.aws_vpc.default.id
-  auto_accept   = true
+  vpc_id      = aws_vpc.tool.id
+  peer_vpc_id = data.aws_vpc.default.id
+  auto_accept = true
 
   tags = {
     Name = "tool-to-default-peering"
   }
 }
 
-################### Update Public Route Table for Tool VPC ###################
+################### Routes for Tool VPC ###################
 
-resource "aws_route" "tool_to_default" {
+resource "aws_route" "tool_to_default_public" {
   route_table_id         = aws_route_table.public_RT.id
   destination_cidr_block = data.aws_vpc.default.cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.tool_to_default.id
 }
 
-################### Update Private Route Table for Tool VPC ###################
-
-resource "aws_route" "tool_private_to_default" {
+resource "aws_route" "tool_to_default_private" {
   route_table_id         = aws_route_table.private_RT.id
   destination_cidr_block = data.aws_vpc.default.cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.tool_to_default.id
 }
 
-################### Fetch Default VPC Route Table ###################
+################### Default VPC Route Table Update ###################
 
 data "aws_route_table" "default" {
   vpc_id = data.aws_vpc.default.id
 }
-
-################### Update Route in Default VPC Route Table ###################
 
 resource "aws_route" "default_to_tool" {
   route_table_id         = data.aws_route_table.default.id
@@ -216,26 +224,26 @@ resource "aws_route" "default_to_tool" {
   vpc_peering_connection_id = aws_vpc_peering_connection.tool_to_default.id
 }
 
-###########EC 2 Instance#################
+################### EC2 Instances ###################
 
 resource "aws_instance" "public" {
-  ami           = var.ami_id
-  instance_type = var.ec2_micro
-  key_name      = var.pem_key
-  subnet_id     = aws_subnet.public.id
+  ami                    = var.ami_id
+  instance_type          = var.ec2_micro
+  key_name               = var.pem_key
+  subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.publicSG.id]
   associate_public_ip_address = true
 
   tags = {
-    Name = "basiton-host"
+    Name = "bastion-host"
   }
 }
 
 resource "aws_instance" "private1" {
-  ami           = var.ami_id
-  instance_type = var.ec2_medium
-  key_name      = var.pem_key
-  subnet_id     = aws_subnet.private1.id
+  ami                    = var.ami_id
+  instance_type          = var.ec2_medium
+  key_name               = var.pem_key
+  subnet_id              = aws_subnet.private1.id
   vpc_security_group_ids = [aws_security_group.privateSG.id]
 
   tags = {
@@ -244,10 +252,10 @@ resource "aws_instance" "private1" {
 }
 
 resource "aws_instance" "private2" {
-  ami           = var.ami_id
-  instance_type = var.ec2_medium
-  key_name      = var.pem_key
-  subnet_id     = aws_subnet.private2.id
+  ami                    = var.ami_id
+  instance_type          = var.ec2_medium
+  key_name               = var.pem_key
+  subnet_id              = aws_subnet.private2.id
   vpc_security_group_ids = [aws_security_group.privateSG.id]
 
   tags = {
@@ -256,16 +264,18 @@ resource "aws_instance" "private2" {
 }
 
 resource "aws_instance" "private3" {
-  ami           = var.ami_id
-  instance_type = var.ec2_medium
-  key_name      = var.pem_key
-  subnet_id     = aws_subnet.private3.id
+  ami                    = var.ami_id
+  instance_type          = var.ec2_medium
+  key_name               = var.pem_key
+  subnet_id              = aws_subnet.private3.id
   vpc_security_group_ids = [aws_security_group.privateSG.id]
 
   tags = {
     Name = "database-host"
   }
 }
+
+################### Backend ###################
 
 terraform {
   backend "s3" {
