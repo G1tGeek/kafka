@@ -1,0 +1,16 @@
+[Unit]
+Description=Apache Kafka server (Kraft mode)
+Documentation=http://kafka.apache.org/documentation.html
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/opt/kafka_{{ kafka_version }}/bin/kafka-server-start.sh /opt/kafka_{{ kafka_version }}/config/server.properties
+ExecStop=/opt/kafka_{{ kafka_version }}/bin/kafka-server-stop.sh
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

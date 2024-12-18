@@ -1,0 +1,11 @@
+plugin: aws_ec2
+regions:
+  - "ap-southeast-1"
+filters:
+  
+  tag:Name:
+    - kafka-host
+  instance-state-name : running
+
+compose:
+  ansible_host: private_ip_address
